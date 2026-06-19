@@ -1,13 +1,29 @@
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:confetti/confetti.dart';
 import 'package:country_flags/country_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const _supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+
+// ─── CRM (Recived_landing_with_token) ────────────────────────────────────────
+// Endpoint del CRM y token de la empresa. El proyecto CRM (bjdqjxrwvktfqienbzop)
+// es DISTINTO al Supabase de esta app, por eso se envía con un POST HTTP directo.
+// Ambos valores se pueden sobrescribir con --dart-define en el build si cambian.
+const _crmEndpoint = String.fromEnvironment(
+  'CRM_ENDPOINT',
+  defaultValue:
+      'https://bjdqjxrwvktfqienbzop.supabase.co/functions/v1/Recived_landing_with_token',
+);
+const _crmToken = String.fromEnvironment(
+  'CRM_TOKEN',
+  defaultValue: 'lt_72560d39ccdf579fbbc6cb7e',
+);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -448,6 +464,9 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
       );
     } catch (_) {}
 
+    // Enviar al CRM (no bloquea el flujo si falla)
+    await _enviarAlCrm(nombre: nombre, email: email, telefono: telefono);
+
     _confettiCtrl.play();
     _mostrarSnack('¡Selección realizada! Revisa tu correo.',
         color: Colors.green[900]!);
@@ -455,6 +474,57 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
 
     await Future.delayed(const Duration(seconds: 4));
     if (mounted) Navigator.of(context).pop(true);
+  }
+
+  /// Envía el lead al CRM (Recived_landing_with_token) con los 16 países
+  /// seleccionados como NOTA. Es no crítico: si falla, no interrumpe el flujo.
+  Future<void> _enviarAlCrm({
+    required String nombre,
+    required String email,
+    required String telefono,
+  }) async {
+    if (_crmEndpoint.isEmpty || _crmToken.isEmpty) {
+      debugPrint('🔴 CRM: endpoint o token no configurados, se omite envío.');
+      return;
+    }
+
+    // Construir la nota con los 16 países (bandera + nombre + grupo)
+    final lineasPaises = [
+      for (var i = 0; i < widget.picks.length; i++)
+        '${i + 1}. ${widget.picks[i].bandera} ${widget.picks[i].nombre} '
+            '(Grupo ${widget.picks[i].grupo})',
+    ].join('\n');
+    final nota = '🏆 Selección Mundial 2026 — ${widget.picks.length} países elegidos:\n'
+        '$lineasPaises';
+
+    final url = Uri.parse(
+      '$_crmEndpoint?token=${Uri.encodeComponent(_crmToken)}',
+    );
+    final payload = {
+      'nombre_completo': nombre,
+      'correo_electronico': email,
+      'telefono': telefono,
+      'evento': 'Selección Mundial 2026',
+      'notas': nota,
+    };
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      );
+      debugPrint(
+        '🟡 CRM Status: ${response.statusCode} | Body: ${response.body}',
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        debugPrint('🟢 CRM: lead enviado correctamente.');
+      } else {
+        debugPrint('🔴 CRM respondió con error: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('⚠️ CRM: error no crítico al enviar: $e');
+    }
   }
 
   @override
