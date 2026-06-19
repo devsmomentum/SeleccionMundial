@@ -439,7 +439,10 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
       });
     } catch (e) {
       if (e is PostgrestException && e.code == '23505') {
-        _mostrarSnack('Este correo ya envió su selección.', color: Colors.orange[900]!);
+        final msg = (e.details ?? '').toString().contains('telefono')
+            ? 'Este número ya envió su selección.'
+            : 'Este correo ya envió su selección.';
+        _mostrarSnack(msg, color: Colors.orange[900]!);
       } else {
         _mostrarSnack('Error al guardar: $e', color: Colors.red[900]!);
       }
