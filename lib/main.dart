@@ -439,7 +439,8 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
       });
     } catch (e) {
       if (e is PostgrestException && e.code == '23505') {
-        final msg = (e.details ?? '').toString().contains('telefono')
+        final errorText = '${e.message} ${e.details ?? ''}'.toLowerCase();
+        final msg = errorText.contains('telefono')
             ? 'Este número ya envió su selección.'
             : 'Este correo ya envió su selección.';
         _mostrarSnack(msg, color: Colors.orange[900]!);
