@@ -197,16 +197,58 @@ class _HomeScreenState extends State<HomeScreen> {
                 setState(() => _filtroConf = _filtroConf == conf ? null : conf),
           ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.only(bottom: 8),
-              children: grupos.entries
-                  .map((e) => _SeccionConfederacion(
-                        confederacion: e.key,
-                        selecciones: e.value,
-                        seleccionados: _seleccionados,
-                        onTap: _toggleSeleccion,
-                      ))
-                  .toList(),
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              cacheExtent: 600,
+              slivers: [
+                ...grupos.entries.expand((e) {
+                  final color = colorConfederacion[e.key] ?? Colors.grey;
+                  return [
+                    SliverToBoxAdapter(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          border: Border(left: BorderSide(color: color, width: 4)),
+                          color: color.withValues(alpha: 0.12),
+                        ),
+                        child: Text(
+                          e.key,
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.all(8),
+                      sliver: SliverGrid(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 6,
+                          childAspectRatio: 0.72,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (_, i) => _PaisCard(
+                            seleccion: e.value[i],
+                            isSelected: _seleccionados.contains(e.value[i].nombre),
+                            accentColor: color,
+                            onTap: () => _toggleSeleccion(e.value[i].nombre),
+                          ),
+                          childCount: e.value.length,
+                          addAutomaticKeepAlives: false,
+                          addSemanticIndexes: false,
+                        ),
+                      ),
+                    ),
+                  ];
+                }),
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+              ],
             ),
           ),
           _PanelConfirmar(
@@ -399,7 +441,11 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
         'paises': widget.picks.map((s) => s.nombre).toList(),
       });
     } catch (e) {
-      _mostrarSnack('Error al guardar: $e', color: Colors.red[900]!);
+      if (e is PostgrestException && e.code == '23505') {
+        _mostrarSnack('Este correo ya envió su selección.', color: Colors.orange[900]!);
+      } else {
+        _mostrarSnack('Error al guardar: $e', color: Colors.red[900]!);
+      }
       setState(() => _enviando = false);
       return;
     }
@@ -601,7 +647,7 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
                       controller: _telefonoCtrl,
                       focusNode: _telefonoFocus,
                       onChanged: (_) => setState(() {}),
-                      hintText: '+1 (000) 000-0000',
+                      hintText: '0424-000-0000',
                       icon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                     ),
@@ -783,64 +829,6 @@ class _FiltroConfederacion extends StatelessWidget {
   }
 }
 
-class _SeccionConfederacion extends StatelessWidget {
-  final String confederacion;
-  final List<Seleccion> selecciones;
-  final Set<String> seleccionados;
-  final void Function(String) onTap;
-
-  const _SeccionConfederacion({
-    required this.confederacion,
-    required this.selecciones,
-    required this.seleccionados,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = colorConfederacion[confederacion] ?? Colors.grey;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            border: Border(left: BorderSide(color: color, width: 4)),
-            color: color.withValues(alpha: 0.12),
-          ),
-          child: Text(
-            confederacion,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              letterSpacing: 1.2,
-            ),
-          ),
-        ),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(8),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 6,
-            childAspectRatio: 0.72,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-          ),
-          itemCount: selecciones.length,
-          itemBuilder: (_, i) => _PaisCard(
-            seleccion: selecciones[i],
-            isSelected: seleccionados.contains(selecciones[i].nombre),
-            accentColor: color,
-            onTap: () => onTap(selecciones[i].nombre),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _PaisCard extends StatelessWidget {
   final Seleccion seleccion;
@@ -880,13 +868,20 @@ class _PaisCard extends StatelessWidget {
                 children: [
                   AspectRatio(
                     aspectRatio: 3 / 2,
-                    child: LayoutBuilder(
-                      builder: (_, c) => CountryFlag.fromCountryCode(
-                        seleccion.isoCode,
-                        height: c.maxHeight,
-                        width: c.maxWidth,
-                      ),
-                    ),
+                    child: seleccion.isoCode == 'GB-SCT' || seleccion.isoCode == 'GB-ENG'
+                        ? FittedBox(
+                            fit: BoxFit.contain,
+                            child: CountryFlag.fromCountryCode(
+                              seleccion.isoCode,
+                              height: 64,
+                              width: 64,
+                            ),
+                          )
+                        : FittedBox(
+                            fit: BoxFit.contain,
+                            child: Text(seleccion.bandera,
+                                style: const TextStyle(fontSize: 64)),
+                          ),
                   ),
                   Expanded(
                     child: Container(
@@ -1235,13 +1230,20 @@ class _PicksPreview extends StatelessWidget {
                   children: [
                     Expanded(
                       flex: 3,
-                      child: LayoutBuilder(
-                        builder: (_, c) => CountryFlag.fromCountryCode(
-                          s.isoCode,
-                          height: c.maxHeight,
-                          width: c.maxWidth,
-                        ),
-                      ),
+                      child: s.isoCode == 'GB-SCT' || s.isoCode == 'GB-ENG'
+                          ? FittedBox(
+                              fit: BoxFit.contain,
+                              child: CountryFlag.fromCountryCode(
+                                s.isoCode,
+                                height: 64,
+                                width: 64,
+                              ),
+                            )
+                          : FittedBox(
+                              fit: BoxFit.contain,
+                              child: Text(s.bandera,
+                                  style: const TextStyle(fontSize: 64)),
+                            ),
                     ),
                     Container(
                       width: double.infinity,
