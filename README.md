@@ -127,3 +127,4 @@ El Edge Function genera un correo HTML con:
 - Lista de los 16 países seleccionados, agrupados y ordenados por grupo
 - Badge de grupo por cada selección
 - Footer con nombre de la app
+Para compilar apk .\build.bat

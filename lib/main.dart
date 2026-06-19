@@ -252,8 +252,12 @@ class EmailCaptureScreen extends StatefulWidget {
 
 class _EmailCaptureScreenState extends State<EmailCaptureScreen>
     with TickerProviderStateMixin {
+  final TextEditingController _nombreCtrl = TextEditingController();
   final TextEditingController _emailCtrl = TextEditingController();
+  final TextEditingController _telefonoCtrl = TextEditingController();
+  final FocusNode _nombreFocus = FocusNode();
   final FocusNode _emailFocus = FocusNode();
+  final FocusNode _telefonoFocus = FocusNode();
   bool _enviando = false;
 
   late final AnimationController _bgCtrl;
@@ -267,8 +271,10 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
   late final List<Animation<double>> _fadeAnims;
   late final List<Animation<Offset>> _slideAnims;
 
-  bool get _emailValido =>
-      RegExp(r'^[\w\.\-]+@[\w\.\-]+\.\w+$').hasMatch(_emailCtrl.text.trim());
+  bool get _formValido =>
+      _nombreCtrl.text.trim().isNotEmpty &&
+      RegExp(r'^[\w\.\-]+@[\w\.\-]+\.\w+$').hasMatch(_emailCtrl.text.trim()) &&
+      _telefonoCtrl.text.trim().isNotEmpty;
 
   @override
   void initState() {
@@ -302,7 +308,7 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
       duration: const Duration(milliseconds: 1400),
     )..forward();
 
-    _fadeAnims = List.generate(6, (i) {
+    _fadeAnims = List.generate(8, (i) {
       return Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(
           parent: _fadeCtrl,
@@ -312,7 +318,7 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
       );
     });
 
-    _slideAnims = List.generate(6, (i) {
+    _slideAnims = List.generate(8, (i) {
       return Tween<Offset>(
               begin: const Offset(0, 0.3), end: Offset.zero)
           .animate(
@@ -334,8 +340,12 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
     _pulseCtrl.dispose();
     _fadeCtrl.dispose();
     _confettiCtrl.dispose();
+    _nombreCtrl.dispose();
     _emailCtrl.dispose();
+    _telefonoCtrl.dispose();
+    _nombreFocus.dispose();
     _emailFocus.dispose();
+    _telefonoFocus.dispose();
     super.dispose();
   }
 
@@ -355,10 +365,12 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
   }
 
   Future<void> _enviarEmail() async {
-    if (!_emailValido || _enviando) return;
+    if (!_formValido || _enviando) return;
     setState(() => _enviando = true);
 
+    final nombre = _nombreCtrl.text.trim();
     final email = _emailCtrl.text.trim();
+    final telefono = _telefonoCtrl.text.trim();
 
     try {
       final existe = await Supabase.instance.client
@@ -381,7 +393,9 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
 
     try {
       await Supabase.instance.client.from('selecciones').insert({
+        'nombre': nombre,
         'email': email,
+        'telefono': telefono,
         'paises': widget.picks.map((s) => s.nombre).toList(),
       });
     } catch (e) {
@@ -394,6 +408,7 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
       await Supabase.instance.client.functions.invoke(
         'send-confirmation',
         body: {
+          'nombre': nombre,
           'email': email,
           'picks': widget.picks
               .map((s) => {
@@ -539,7 +554,7 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
                   _fadeSlide(
                     2,
                     Text(
-                      'Ingresa tu correo para sellar tus\npredicciones y asegurar tu lugar.',
+                      'Completa tus datos para confirmar\ntu selección y participar.',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.poppins(
                         fontSize: 13,
@@ -551,9 +566,25 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
 
                   const SizedBox(height: 28),
 
-                  // Glass input
+                  // Nombre
                   _fadeSlide(
                     3,
+                    _GlassInput(
+                      controller: _nombreCtrl,
+                      focusNode: _nombreFocus,
+                      onChanged: (_) => setState(() {}),
+                      hintText: 'Nombre completo',
+                      icon: Icons.person_outline,
+                      keyboardType: TextInputType.name,
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // Email
+                  _fadeSlide(
+                    4,
                     _GlassInput(
                       controller: _emailCtrl,
                       focusNode: _emailFocus,
@@ -561,16 +592,31 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
                     ),
                   ),
 
+                  const SizedBox(height: 14),
+
+                  // Teléfono
+                  _fadeSlide(
+                    5,
+                    _GlassInput(
+                      controller: _telefonoCtrl,
+                      focusNode: _telefonoFocus,
+                      onChanged: (_) => setState(() {}),
+                      hintText: '+1 (000) 000-0000',
+                      icon: Icons.phone_outlined,
+                      keyboardType: TextInputType.phone,
+                    ),
+                  ),
+
                   const SizedBox(height: 20),
 
                   // CTA button with pulse
                   _fadeSlide(
-                    4,
+                    6,
                     ScaleTransition(
                       scale: _pulseAnim,
                       child: _ShimmerButton(
                         shimmerAnim: _shimmerAnim,
-                        enabled: _emailValido && !_enviando,
+                        enabled: _formValido && !_enviando,
                         enviando: _enviando,
                         onTap: _enviarEmail,
                       ),
@@ -580,7 +626,7 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
                   const SizedBox(height: 32),
 
                   // Picks preview
-                  _fadeSlide(5, _PicksPreview(picks: widget.picks)),
+                  _fadeSlide(7, _PicksPreview(picks: widget.picks)),
                 ],
               ),
             ),
@@ -624,7 +670,7 @@ class _MundialHeader extends StatelessWidget {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'MUNDIAL 2026',
+                      'HAZ TU SELECCIÓN Y GANA PREMIOS',
                       style: GoogleFonts.bebasNeue(
                         fontSize: 36,
                         color: Colors.white,
@@ -947,11 +993,19 @@ class _GlassInput extends StatefulWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final void Function(String) onChanged;
+  final String hintText;
+  final IconData icon;
+  final TextInputType keyboardType;
+  final TextCapitalization textCapitalization;
 
   const _GlassInput({
     required this.controller,
     required this.focusNode,
     required this.onChanged,
+    this.hintText = 'tu@correo.com',
+    this.icon = Icons.email_outlined,
+    this.keyboardType = TextInputType.emailAddress,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   @override
@@ -1007,14 +1061,15 @@ class _GlassInputState extends State<_GlassInput> {
               controller: widget.controller,
               focusNode: widget.focusNode,
               onChanged: widget.onChanged,
-              keyboardType: TextInputType.emailAddress,
+              keyboardType: widget.keyboardType,
+              textCapitalization: widget.textCapitalization,
               style: GoogleFonts.poppins(color: Colors.white, fontSize: 15),
               decoration: InputDecoration(
-                hintText: 'tu@correo.com',
+                hintText: widget.hintText,
                 hintStyle:
                     GoogleFonts.poppins(color: Colors.white30, fontSize: 15),
                 prefixIcon: Icon(
-                  Icons.email_outlined,
+                  widget.icon,
                   color: _focused ? const Color(0xFF00E5FF) : Colors.white38,
                   size: 20,
                 ),
