@@ -415,25 +415,6 @@ class _EmailCaptureScreenState extends State<EmailCaptureScreen>
     final telefono = _telefonoCtrl.text.trim();
 
     try {
-      final existe = await Supabase.instance.client
-          .from('selecciones')
-          .select('id')
-          .eq('email', email)
-          .maybeSingle();
-
-      if (existe != null) {
-        _mostrarSnack('Este correo ya envió su selección.',
-            color: Colors.orange[900]!);
-        setState(() => _enviando = false);
-        return;
-      }
-    } catch (e) {
-      _mostrarSnack('Error al verificar: $e', color: Colors.red[900]!);
-      setState(() => _enviando = false);
-      return;
-    }
-
-    try {
       await Supabase.instance.client.from('selecciones').insert({
         'nombre': nombre,
         'email': email,
